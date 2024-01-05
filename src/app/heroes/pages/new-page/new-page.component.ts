@@ -3,7 +3,7 @@ import { FormControl, FormGroup } from '@angular/forms';
 import { Hero, Publisher } from '../../interfaces/hero.interface';
 import { HeroService } from '../../services/heroes.service';
 import { ActivatedRoute, Router } from '@angular/router';
-import { switchMap } from 'rxjs';
+import { filter, switchMap, tap } from 'rxjs';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
 import { ConfirmDialogComponent } from '../../components/confirm-dialog/confirm-dialog.component';
@@ -68,7 +68,6 @@ export class NewPageComponent implements OnInit {
 
     if (this.currentHero.id) {
       this.heroService.updateHero(this.currentHero).subscribe((hero) => {
-        // TODO mostrar snackbar
         this.showSanckbar(`${hero.superhero} updated!!`);
       });
 
@@ -76,7 +75,6 @@ export class NewPageComponent implements OnInit {
     }
 
     this.heroService.addHero(this.currentHero).subscribe((hero) => {
-      // TODO: mostrar snackbar y navegar a /heroes/edit/ hero.id
       this.router.navigate(['/heroes/edit', hero.id]);
       this.showSanckbar(`${hero.superhero} created!!`);
     });
@@ -89,12 +87,17 @@ export class NewPageComponent implements OnInit {
       data: this.heroForm.value,
     });
 
-    dialogRef.afterClosed().subscribe((result) => {
-      if (!result) return;
-
-      this.heroService.deleteHero(this.currentHero.id);
-      this.router.navigate(['/heroes']);
-    });
+    dialogRef
+      .afterClosed()
+      .pipe(
+        filter((result: boolean) => result),
+        switchMap(() => this.heroService.deleteHero(this.currentHero.id)),
+        filter((wasDeleted: boolean) => wasDeleted),
+        tap((wasDeleted) => console.log({ wasDeleted }))
+      )
+      .subscribe(() => {
+        this.router.navigate(['/heroes']);
+      });
   }
 
   showSanckbar(message: string): void {
